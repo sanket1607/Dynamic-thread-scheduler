@@ -27,6 +27,10 @@ int scheduler_create(scheduler_fnc_t fnc, void *arg) {
     long unsigned pagesize = page_size();
 
     new_thread = (struct thread*) malloc(sizeof(struct thread));
+    if (new_thread == NULL) {
+        destroyer();
+        EXIT("Malloc failed");
+    }
     new_thread->status = STATUS_;
     new_thread->function_pointer = fnc;
     new_thread->arg = arg;
