@@ -31,11 +31,12 @@ int scheduler_create(scheduler_fnc_t fnc, void *arg) {
         destroyer();
         EXIT("Malloc failed");
     }
+    memset(new_thread, 0, sizeof (struct thread));
     new_thread->status = STATUS_;
     new_thread->function_pointer = fnc;
     new_thread->arg = arg;
     
-    new_thread->stack.memory = malloc(pagesize * 3);
+    new_thread->stack.memory = malloc(1024*1024+pagesize);
     if (new_thread->stack.memory == NULL) {
         destroyer();
         EXIT("Malloc failed");
@@ -51,30 +52,29 @@ int scheduler_create(scheduler_fnc_t fnc, void *arg) {
 void scheduler_execute(void) {
     struct thread *runThread;
     setjmp(state.context);
-    while (1) {
-        if (SIG_ERR == signal(SIGALRM, interrupt_handler)) {
-            EXIT("Signal failed");
-        }
-    
-        runThread = scheduler_find();
-        if (runThread == NULL)
-            return;
+    if (SIG_ERR == signal(SIGALRM, interrupt_handler)) {
+        EXIT("Signal failed");
+    }
 
-        state.current_thread = runThread;
+    runThread = scheduler_find();
+    if (runThread == NULL)
+        return;
 
-        alarm(1);
-        if ((runThread->status) == STATUS_) {
-            uint64_t rsp = (uint64_t)runThread->stack.memory_ + (2 * page_size());
-            __asm__ volatile ("mov %[rs], %%rsp \n" : [rs] "+r" (rsp) ::);
+    state.current_thread = runThread;
 
-            runThread->status = STATUS_RUNNING;            
-            runThread->function_pointer(runThread->arg);
-            runThread -> status = STATUS_TERMINATED;
-        }
-        else {
-            runThread->status = STATUS_RUNNING;
-            longjmp(runThread->environ, 1);
-        }
+    alarm(1);
+    if ((runThread->status) == STATUS_) {
+        uint64_t rsp = (uint64_t)runThread->stack.memory_ + (1024 * 1024);
+        __asm__ volatile ("mov %[rs], %%rsp \n" : [rs] "+r" (rsp) ::);
+
+        runThread->status = STATUS_RUNNING;            
+        runThread->function_pointer(runThread->arg);
+        runThread -> status = STATUS_TERMINATED;
+        longjmp(state.context,1);
+    }
+    else {
+        runThread->status = STATUS_RUNNING;
+        longjmp(runThread->environ, 1);
     }
 }
 
